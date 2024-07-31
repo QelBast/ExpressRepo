@@ -1,0 +1,98 @@
+services:
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: qel-express-frontend
+    command: serve -s build -l 3000
+    restart: unless-stopped
+    env_file:
+      - frontend.env
+    networks:
+      - qel-express-network
+
+  api:
+    build: 
+      context: ./api
+    container_name: qel-express-api
+    command: npm run start
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file:
+      - api.env
+    depends_on:
+      - api_db
+    networks:
+      - qel-express-network
+  
+  auth:
+    build:
+      context: ./auth
+    container_name: qel-express-auth
+    command: npm run start
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    env_file:
+      - auth.env
+    depends_on:
+      - auth_db
+    networks:
+      - qel-express-network
+  
+  mailer:
+    build: 
+      context: ./mailer
+      dockerfile: Dockerfile
+    container_name: qel-express-mailer
+    command: npm run start
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    env_file:
+      - mailer.env
+    depends_on:
+      - frontend
+      - auth
+      - api
+    networks:
+      - qel-express-network
+
+  api_db:
+    image: mongo:latest
+    container_name: qel-express-api-db
+    volumes:
+      - mongodb_api:/data/db
+    networks:
+      - qel-express-network
+  
+  auth_db:
+    image: mongo:latest
+    container_name: qel-express-auth-db
+    volumes:
+      - mongodb_auth:/data/db
+    networks:
+      - qel-express-network
+  
+  nginx:
+    image: nginx:stable-alpine
+    container_name: qel-express-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf.prod:/etc/nginx/conf.d/nginx.conf
+    depends_on:
+      - frontend
+      - api
+      - auth
+    networks:
+      - qel-express-network
+
+volumes:
+  mongodb_api:
+  mongodb_auth:
+
+networks:
+  qel-express-network:
+    driver: bridge
